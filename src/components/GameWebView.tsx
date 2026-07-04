@@ -8,8 +8,9 @@
  * Install dependency:
  *   npx expo install react-native-webview
  */
+import * as FileSystem from "expo-file-system/legacy";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { BackHandler, Image, Platform, StyleSheet, View } from "react-native";
+import { BackHandler, Platform, StyleSheet, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import {
   BAD_SIZE,
@@ -71,44 +72,38 @@ const RAW_ASSETS: Record<string, any> = {
 };
 
 // ─────────────────────────────────────────────
-//  Resolve a require() module ID to a URI string
+//  Convert any asset to a base64 data URI.
+//  Works in BOTH Expo Go (dev) AND production APK:
+//
+//  1. Use expo-asset to download/locate the bundled file
+//  2. Use expo-file-system to read it as base64
+//  3. Wrap in a data URI
+//
+//  Install if not already present:
+//    npx expo install expo-asset expo-file-system
 // ─────────────────────────────────────────────
-function resolveURI(asset: any): string {
-  if (!asset) return "";
-  if (typeof asset === "string") return asset;
-  if (typeof asset === "object" && typeof asset.uri === "string")
-    return asset.uri;
-  if (typeof asset === "number") {
-    try {
-      const source = Image.resolveAssetSource(asset);
-      return source?.uri ?? "";
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
-
-// ─────────────────────────────────────────────
-//  Fetch a URI and return a base64 data URI.
-//  This makes the image fully self-contained —
-//  no network access needed inside the WebView.
-// ─────────────────────────────────────────────
-async function toBase64DataURI(uri: string): Promise<string> {
-  if (!uri) return "";
-  // Already a data URI — pass through
-  if (uri.startsWith("data:")) return uri;
+async function toBase64DataURI(moduleId: any): Promise<string> {
   try {
-    const res = await fetch(uri);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    const { Asset } = await import("expo-asset");
+    const [asset] = await Asset.loadAsync(moduleId);
+
+    const localUri = asset.localUri ?? asset.uri;
+    if (!localUri) return "";
+
+    // Use the statically imported FileSystem from expo-file-system/legacy
+    const base64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
+
+    const mime =
+      localUri.toLowerCase().endsWith(".jpg") ||
+      localUri.toLowerCase().endsWith(".jpeg")
+        ? "image/jpeg"
+        : "image/png";
+
+    return `data:${mime};base64,${base64}`;
   } catch (e) {
-    console.warn("[GameWebView] Failed to convert to base64:", uri, e);
+    console.warn("[GameWebView] Failed to read asset as base64:", e);
     return "";
   }
 }
@@ -119,9 +114,8 @@ async function toBase64DataURI(uri: string): Promise<string> {
 async function loadAllBase64(): Promise<Record<string, string>> {
   const entries = Object.entries(RAW_ASSETS);
   const results = await Promise.all(
-    entries.map(async ([key, asset]) => {
-      const uri = resolveURI(asset);
-      const data64 = await toBase64DataURI(uri);
+    entries.map(async ([key, moduleId]) => {
+      const data64 = await toBase64DataURI(moduleId);
       return [key, data64] as [string, string];
     }),
   );
