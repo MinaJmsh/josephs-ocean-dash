@@ -12,6 +12,7 @@ const fs = require("fs");
 const path = require("path");
 
 const IMAGES_DIR = path.join(__dirname, "../assets/images");
+const FONTS_DIR = path.join(__dirname, "../assets/fonts");
 const OUT_FILE = path.join(__dirname, "../src/constants/gameAssets.ts");
 
 const IMAGE_KEYS = [
@@ -74,6 +75,25 @@ for (const key of IMAGE_KEYS) {
   console.log(`  OK  ${key} (${kb} KB)`);
   entries.push(`  ${JSON.stringify(key)}: ${JSON.stringify(uri)},`);
 }
+
+// ── Bundle the pixel font as base64 too ──────────────────────────────────────
+console.log("\nGenerating base64 font...");
+let fontB64 = "";
+const fontPath = path.join(FONTS_DIR, "PressStart2P-Regular.ttf");
+if (fs.existsSync(fontPath)) {
+  fontB64 = fs.readFileSync(fontPath).toString("base64");
+  const kb = Math.round(fs.statSync(fontPath).size / 1024);
+  console.log(`  OK  PressStart2P-Regular.ttf (${kb} KB)`);
+} else {
+  console.warn("  MISSING: assets/fonts/PressStart2P-Regular.ttf");
+  console.warn(
+    "  Download from: https://fonts.google.com/specimen/Press+Start+2P",
+  );
+  console.warn("  Place the .ttf in assets/fonts/ and re-run this script.");
+}
+entries.push(
+  `  '__font_pressstart2p__': ${JSON.stringify(fontB64 ? "data:font/truetype;base64," + fontB64 : "")},`,
+);
 
 const output = `// AUTO-GENERATED — do not edit by hand.
 // Run:  node scripts/generate-assets.js

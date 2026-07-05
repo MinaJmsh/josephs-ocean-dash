@@ -56,7 +56,7 @@ function buildGameHTML(): string {
 <style>
 @font-face {
   font-family: 'PressStart2P';
-  src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2');
+  src: url('${GAME_ASSETS["__font_pressstart2p__"] || "https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2"}') format('${GAME_ASSETS["__font_pressstart2p__"] ? "truetype" : "woff2"}');
   font-weight: normal;
   font-style: normal;
   font-display: block;
